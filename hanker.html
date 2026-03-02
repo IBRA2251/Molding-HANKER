@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Hanker Voice Agent</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #060a0f;
+      --panel: #0a1018;
+      --border: #1a2a3a;
+      --accent: #00aaff;
+      --accent2: #0055aa;
+      --glow: rgba(0, 170, 255, 0.15);
+      --text: #c8ddf0;
+      --dim: #3a5a7a;
+      --danger: #ff4455;
+      --success: #00ffaa;
+    }
+
+    body {
+      font-family: 'Share Tech Mono', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* Scanlines */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.08) 2px,
+        rgba(0,0,0,0.08) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    /* Grid background */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.3;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 40px;
+      padding: 40px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+    }
+
+    .title {
+      font-family: 'Orbitron', monospace;
+      font-size: 3.5rem;
+      font-weight: 900;
+      letter-spacing: 0.3em;
+      color: var(--accent);
+      text-shadow: 0 0 20px var(--accent), 0 0 40px var(--accent2);
+      animation: flicker 8s infinite;
+    }
+
+    .subtitle {
+      font-size: 0.75rem;
+      letter-spacing: 0.4em;
+      color: var(--dim);
+      margin-top: 6px;
+    }
+
+    @keyframes flicker {
+      0%, 95%, 100% { opacity: 1; }
+      96% { opacity: 0.85; }
+      97% { opacity: 1; }
+      98% { opacity: 0.9; }
+    }
+
+    /* Core orb */
+    .orb-container {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .orb-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid var(--accent);
+      opacity: 0.2;
+      animation: rotate 10s linear infinite;
+    }
+    .orb-ring:nth-child(1) { width: 200px; height: 200px; animation-duration: 12s; }
+    .orb-ring:nth-child(2) { width: 170px; height: 170px; border-style: dashed; animation-direction: reverse; animation-duration: 8s; opacity: 0.15; }
+    .orb-ring:nth-child(3) { width: 140px; height: 140px; animation-duration: 6s; opacity: 0.1; }
+
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .orb {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #1a6aaa, #020810);
+      border: 1px solid var(--accent2);
+      box-shadow: 0 0 20px var(--glow), inset 0 0 20px rgba(0,0,0,0.5);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .orb::after {
+      content: '';
+      position: absolute;
+      top: 15%;
+      left: 20%;
+      width: 30%;
+      height: 20%;
+      background: rgba(255,255,255,0.1);
+      border-radius: 50%;
+      filter: blur(4px);
+    }
+
+    .orb.listening {
+      box-shadow: 0 0 30px rgba(0,170,255,0.3), 0 0 60px rgba(0,170,255,0.1), inset 0 0 20px rgba(0,0,0,0.5);
+      animation: pulse-listen 3s ease-in-out infinite;
+    }
+
+    .orb.thinking {
+      background: radial-gradient(circle at 35% 35%, #aa6a00, #080402);
+      border-color: #aa6600;
+      box-shadow: 0 0 30px rgba(255,150,0,0.3), inset 0 0 20px rgba(0,0,0,0.5);
+      animation: pulse-think 0.8s ease-in-out infinite;
+    }
+
+    .orb.speaking {
+      background: radial-gradient(circle at 35% 35%, #006aaa, #020810);
+      box-shadow: 0 0 40px rgba(0,200,255,0.5), 0 0 80px rgba(0,100,255,0.2), inset 0 0 20px rgba(0,0,0,0.5);
+      animation: pulse-speak 0.4s ease-in-out infinite alternate;
+    }
+
+    .orb.interrupted {
+      background: radial-gradient(circle at 35% 35%, #aa0022, #080002);
+      border-color: var(--danger);
+      box-shadow: 0 0 30px rgba(255,50,80,0.3), inset 0 0 20px rgba(0,0,0,0.5);
+    }
+
+    @keyframes pulse-listen {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+    @keyframes pulse-think {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.06); opacity: 1; }
+    }
+    @keyframes pulse-speak {
+      from { transform: scale(1); }
+      to { transform: scale(1.08); }
+    }
+
+    /* Sound wave bars */
+    .wave-bars {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      height: 30px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .wave-bars.active { opacity: 1; }
+    .wave-bars .bar {
+      width: 3px;
+      background: var(--accent);
+      border-radius: 2px;
+      animation: wave 0.6s ease-in-out infinite;
+    }
+    .wave-bars .bar:nth-child(1) { animation-delay: 0s; }
+    .wave-bars .bar:nth-child(2) { animation-delay: 0.1s; }
+    .wave-bars .bar:nth-child(3) { animation-delay: 0.2s; }
+    .wave-bars .bar:nth-child(4) { animation-delay: 0.3s; }
+    .wave-bars .bar:nth-child(5) { animation-delay: 0.2s; }
+    .wave-bars .bar:nth-child(6) { animation-delay: 0.1s; }
+    .wave-bars .bar:nth-child(7) { animation-delay: 0s; }
+
+    @keyframes wave {
+      0%, 100% { height: 4px; }
+      50% { height: 28px; }
+    }
+
+    /* Status panel */
+    .status-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 12px 28px;
+      min-width: 280px;
+      text-align: center;
+      position: relative;
+      clip-path: polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%);
+    }
+
+    .status-panel::before {
+      content: 'STATUS';
+      position: absolute;
+      top: -9px;
+      left: 20px;
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      color: var(--dim);
+      background: var(--panel);
+      padding: 0 6px;
+    }
+
+    #status {
+      font-family: 'Orbitron', monospace;
+      font-size: 0.85rem;
+      letter-spacing: 0.15em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    /* Transcript panel */
+    .transcript-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 16px 24px;
+      width: 400px;
+      min-height: 60px;
+      position: relative;
+    }
+
+    .transcript-panel::before {
+      content: 'AUDIO INPUT';
+      position: absolute;
+      top: -9px;
+      left: 16px;
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      color: var(--dim);
+      background: var(--panel);
+      padding: 0 6px;
+    }
+
+    #transcript {
+      font-size: 0.85rem;
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 24px;
+    }
+
+    #transcript:empty::before {
+      content: '— awaiting input —';
+      color: var(--dim);
+    }
+
+    /* Info row */
+    .info-row {
+      display: flex;
+      gap: 16px;
+    }
+
+    .badge {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      padding: 4px 12px;
+      border: 1px solid var(--border);
+      color: var(--dim);
+      text-transform: uppercase;
+    }
+
+    .badge.active {
+      border-color: var(--success);
+      color: var(--success);
+      box-shadow: 0 0 8px rgba(0,255,170,0.2);
+    }
+
+    /* Corner decorations */
+    .corner {
+      position: fixed;
+      width: 60px;
+      height: 60px;
+    }
+    .corner.tl { top: 20px; left: 20px; border-top: 1px solid var(--accent); border-left: 1px solid var(--accent); opacity: 0.4; }
+    .corner.tr { top: 20px; right: 20px; border-top: 1px solid var(--accent); border-right: 1px solid var(--accent); opacity: 0.4; }
+    .corner.bl { bottom: 20px; left: 20px; border-bottom: 1px solid var(--accent); border-left: 1px solid var(--accent); opacity: 0.4; }
+    .corner.br { bottom: 20px; right: 20px; border-bottom: 1px solid var(--accent); border-right: 1px solid var(--accent); opacity: 0.4; }
+
+    /* Wake word hint */
+    .hint {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      color: var(--dim);
+      text-align: center;
+    }
+    .hint span { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
+
+  <div class="container">
+    <div class="header">
+      <div class="title">JARVIS</div>
+      <div class="subtitle">HANKER VOICE INTERFACE v2.0</div>
+    </div>
+
+    <div class="orb-container">
+      <div class="orb-ring"></div>
+      <div class="orb-ring"></div>
+      <div class="orb-ring"></div>
+      <div class="orb listening" id="orb"></div>
+    </div>
+
+    <div class="wave-bars" id="waveBars">
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+    </div>
+
+    <div class="status-panel">
+      <div id="status">Always Listening</div>
+    </div>
+
+    <div class="transcript-panel">
+      <div id="transcript"></div>
+    </div>
+
+    <div class="info-row">
+      <div class="badge" id="convBadge">Passive Mode</div>
+      <div class="badge active">RECOGNITION ACTIVE</div>
+    </div>
+
+    <div class="hint">say <span>"jarvis"</span> to activate &nbsp;·&nbsp; <span>"thanks jarvis"</span> to deactivate</div>
+  </div>
+
+<script>
+const statusDiv = document.getElementById("status");
+const transcriptDiv = document.getElementById("transcript");
+const orb = document.getElementById("orb");
+const waveBars = document.getElementById("waveBars");
+const convBadge = document.getElementById("convBadge");
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SpeechRecognition) alert("Please use Chrome.");
+
+const recognition = new SpeechRecognition();
+recognition.lang = "en-US";
+recognition.continuous = true;
+recognition.interimResults = false;
+recognition.maxAlternatives = 1;
+
+let voices = speechSynthesis.getVoices();
+let voice = getVoice();
+
+function getVoice() {
+  return (
+    voices.find(v => v.name.includes("Google UK English Male")) ||
+    voices.find(v => v.name.includes("Microsoft Ryan")) ||
+    voices.find(v => v.lang === "en-GB") ||
+    voices[0]
+  );
+}
+
+speechSynthesis.onvoiceschanged = () => {
+  voices = speechSynthesis.getVoices();
+  voice = getVoice();
+};
+
+let conversationActive = false;
+let isSpeaking = false;
+let interrupted = false;
+let currentSentences = [];
+let currentSentenceIndex = 0;
+let currentSentence = "";
+let returnSentence = "";
+
+/* ================================
+   STATE / UI HELPERS
+================================ */
+
+function setOrbState(state) {
+  orb.className = 'orb ' + state;
+}
+
+function setStatus(text, state = 'listening') {
+  statusDiv.innerText = text;
+  setOrbState(state);
+  waveBars.className = 'wave-bars' + (state === 'speaking' ? ' active' : '');
+}
+
+/* ================================
+   JARVIS VOICE
+================================ */
+
+function getJarvisVoice(sentence) {
+  const utterance = new SpeechSynthesisUtterance(sentence);
+  utterance.voice = voice;
+  utterance.pitch = 0.82;
+  utterance.rate = 1.1;
+  utterance.volume = 1;
+  return utterance;
+}
+
+function jarvisFormat(text) {
+  return text
+    .replace(/\./g, ". ... ")
+    .replace(/\?/g, "? ... ");
+}
+
+function speak(text) {
+  speechSynthesis.cancel();
+
+  setTimeout(() => {
+    interrupted = false;
+
+    const formatted = jarvisFormat(text);
+    currentSentences = formatted.match(/[^\.!\?]+[\.!\?]+/g) || [formatted];
+    currentSentenceIndex = 0;
+    speakNextSentence();
+  }, 150);
+}
+
+function speakNextSentence() {
+  if (currentSentenceIndex >= currentSentences.length) {
+    isSpeaking = false;
+    setStatus("Listening...");
+    return;
+  }
+
+  currentSentence = currentSentences[currentSentenceIndex];
+  if (currentSentence.endsWith("...")) {
+    currentSentence = currentSentence.replaceAll('.', '');
+  } else {
+    returnSentence = currentSentence;
+  }
+
+  const utterance = getJarvisVoice(currentSentence);
+
+  utterance.onstart = () => {
+    isSpeaking = true;
+    setStatus("Speaking...", "speaking");
+  };
+
+  utterance.onend = () => {
+    // isSpeaking = false;
+
+    if (interrupted) {
+      interrupted = false;
+      setStatus("Listening...");
+      return; // stop — wait for user to finish
+    }
+
+    currentSentenceIndex++;
+    speakNextSentence();
+  };
+
+  speechSynthesis.speak(utterance);
+}
+
+function resumeSpeaking() {
+  if (currentSentences.length === 0) return;
+  interrupted = false;
+  speechSynthesis.resume();
+  speechSynthesis.resume();
+  speakNextSentence(); // replays from currentSentenceIndex (same interrupted sentence)
+}
+
+/* ================================
+   BACKEND CALL
+================================ */
+
+async function sendToBackend(text) {
+  setStatus("Thinking...", "thinking");
+  try {
+    const response = await fetch("http://localhost:5678/webhook/n8n", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, returnSentence })
+    });
+
+    const data = await response.json();
+    const reply = data.output || data.last_message || JSON.stringify(data);
+
+    speak(reply);
+
+  } catch (error) {
+    console.error(error);
+    setStatus("Backend Error", "interrupted");
+  }
+}
+
+/* ================================
+   RECOGNITION EVENTS
+================================ */
+
+// function stopSpeaking() {
+//   speechSynthesis.pause();
+//   speechSynthesis.cancel();
+//   speechSynthesis.pause();
+//   speechSynthesis.cancel();
+//   speechSynthesis.pause();
+//   speechSynthesis.cancel();
+//   speechSynthesis.pause();
+//   speechSynthesis.cancel();
+// }
+
+// recognition.onspeechstart = function() {
+//   if (isSpeaking) {
+//     interrupted = true;
+//     stopSpeaking();
+//     console.log('i have been interrupted')
+//     setStatus("User Speaking...", "interrupted");
+//   }
+// }
+
+// recognition.onspeechend = function() {
+//   if (interrupted) {
+//     // User made noise but maybe didn't say anything — resume
+//     // (if onresult fires too, speak(reply) will override this)
+//     setTimeout(() => {
+//       if (interrupted) {
+//         resumeSpeaking();
+//       }
+//     }, 200); // small delay to let onresult fire first if there's a transcript
+//   }
+// }
+
+
+async function setupMicMonitor() {
+  const stream = await navigator.mediaDevices.getUserMedia({ 
+    audio: {
+      echoCancellation: true,  // filters out speaker audio
+      noiseSuppression: true,
+      autoGainControl: true
+    }
+  });
+  // const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const audioContext = new AudioContext();
+  const source = audioContext.createMediaStreamSource(stream);
+  const analyser = audioContext.createAnalyser();
+  analyser.fftSize = 256;
+  source.connect(analyser);
+
+  const dataArray = new Uint8Array(analyser.frequencyBinCount);
+  let wasSilent = true;
+
+  setInterval(() => {
+    analyser.getByteFrequencyData(dataArray);
+    const volume = dataArray.reduce((a, b) => a + b) / dataArray.length;
+    console.log('checking');
+
+    if (volume > 35 && wasSilent) {
+      wasSilent = false;
+      console.log('i am speaking', isSpeaking);
+      if (isSpeaking) {
+        console.log('i have been interrupted');
+        interrupted = true;
+        speechSynthesis.pause();
+        speechSynthesis.pause();
+        speechSynthesis.pause();
+        speechSynthesis.pause();
+        setStatus("User Speaking...", "interrupted");
+      }
+    }
+
+    if (volume < 30 && !wasSilent) {
+      wasSilent = true;
+      if (interrupted) {
+        setTimeout(() => {
+          if (interrupted) resumeSpeaking();
+        }, 300);
+      }
+    }
+
+  }, 200);
+}
+
+
+recognition.onresult = function(event) {
+  const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
+  console.log(event.results)
+  transcriptDiv.innerText = transcript;
+
+  // Wake word
+  if (!conversationActive && transcript.includes("jarvis")) {
+    conversationActive = true;
+    convBadge.textContent = "Conversation Active";
+    convBadge.className = "badge active";
+    setStatus("Conversation Active");
+    speak("Yes?");
+    return;
+  }
+
+  // End phrase
+  if (conversationActive && transcript.includes("thanks jarvis")) {
+    conversationActive = false;
+    convBadge.textContent = "Passive Mode";
+    convBadge.className = "badge";
+    speechSynthesis.cancel();
+    setStatus("Always Listening");
+    speak("You're welcome.");
+    return;
+  }
+
+  // Conversation mode — send to backend (overrides any pending resume)
+  if (conversationActive) {
+    interrupted = false; // prevent resume since we're getting a new reply
+    sendToBackend(transcript);
+  }
+};
+
+recognition.onerror = function(event) {
+  console.error("Recognition error:", event.error);
+  recognition.start();
+};
+
+recognition.onend = function() {
+  recognition.start();
+};
+
+recognition.start();
+setupMicMonitor();
+</script>
+
+</body>
+</html>
